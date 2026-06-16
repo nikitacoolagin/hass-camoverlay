@@ -1,0 +1,29 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "CamOverlay",
+        "description": "Set the MQTT topic prefix the app publishes under (default: camoverlay). Devices are discovered automatically.",
+        "data": {
+          "prefix": "MQTT topic prefix",
+          "camera_entity": "Camera entity (optional, for dashboards)"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "CamOverlay is already configured.",
+      "mqtt_required": "The MQTT integration must be configured first."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "CamOverlay options",
+        "data": {
+          "prefix": "MQTT topic prefix",
+          "camera_entity": "Camera entity (optional, for dashboards)"
+        }
+      }
+    }
+  }
+}

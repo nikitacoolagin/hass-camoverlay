@@ -1,0 +1,23 @@
+# build artifacts
+android/build/
+android/build-phone/
+*.apk
+*.dex
+*.class
+
+# signing keys (never commit)
+*.keystore
+*.jks
+
+# android sdk / jdk (provide your own)
+tools/
+
+# python
+__pycache__/
+*.pyc
+
+# editor / os
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

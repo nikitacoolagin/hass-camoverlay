@@ -1,0 +1,57 @@
+fullscreen:
+  name: Fullscreen
+  description: Show the camera fullscreen on a device.
+  fields:
+    device:
+      name: Device
+      description: Device name (e.g. tv, phone).
+      required: true
+      example: tv
+      selector:
+        text:
+
+stop:
+  name: Stop
+  description: Hide the overlay / close fullscreen on a device.
+  fields:
+    device:
+      name: Device
+      description: Device name (e.g. tv, phone).
+      required: true
+      example: tv
+      selector:
+        text:
+
+pip:
+  name: Picture-in-picture
+  description: Show the camera as a floating window on a device.
+  fields:
+    device:
+      name: Device
+      description: Device name (e.g. tv, phone).
+      required: true
+      example: tv
+      selector:
+        text:
+    size:
+      name: Size
+      description: "quarter = 1/2 of screen width, small = 1/4 of screen width."
+      required: false
+      default: quarter
+      selector:
+        select:
+          options:
+            - quarter
+            - small
+    corner:
+      name: Corner
+      description: Which corner to dock the window in.
+      required: false
+      default: br
+      selector:
+        select:
+          options:
+            - tl
+            - tr
+            - bl
+            - br
