@@ -2,6 +2,7 @@
 android/build/
 android/build-phone/
 *.apk
+!dist/*.apk
 *.dex
 *.class
 

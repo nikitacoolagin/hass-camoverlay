@@ -94,7 +94,14 @@ Home Assistant publishes a command (`pip` / `full` / `stop`) to `camoverlay/<dev
 
 #### 2. Android app
 
-Grab `camoverlay.apk` from the [Releases](../../releases) page, or build it yourself (see [`android/README.md`](android/README.md)).
+Download a prebuilt APK from [`dist/`](dist/):
+
+| Device | APK |
+| --- | --- |
+| Android TV | [`dist/camoverlay-tv.apk`](dist/camoverlay-tv.apk) |
+| Phone / tablet | [`dist/camoverlay-phone.apk`](dist/camoverlay-phone.apk) |
+
+You can also grab one from the [Releases](../../releases) page, or build it yourself (see [`android/README.md`](android/README.md)).
 
 Install it on the TV/phone, open it once, and use the in-app checklist to:
 
@@ -359,7 +366,14 @@ Home Assistant публикует команду (`pip` / `full` / `stop`) в `c
 
 #### 2. Android-приложение
 
-Возьмите `camoverlay.apk` со страницы [Releases](../../releases) или соберите сами (см. [`android/README.md`](android/README.md)).
+Скачайте готовый APK из папки [`dist/`](dist/):
+
+| Устройство | APK |
+| --- | --- |
+| Android TV | [`dist/camoverlay-tv.apk`](dist/camoverlay-tv.apk) |
+| Телефон / планшет | [`dist/camoverlay-phone.apk`](dist/camoverlay-phone.apk) |
+
+Также можно взять со страницы [Releases](../../releases) или собрать самостоятельно (см. [`android/README.md`](android/README.md)).
 
 Установите на ТВ/телефон, откройте один раз и по внутреннему чек-листу:
 
