@@ -12,6 +12,8 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .const import (
     DEFAULT_CORNER,
     DEFAULT_SIZE,
+    GO2RTC_FRAME_PATH,
+    MAX_CAMERAS,
     PAYLOAD_ONLINE,
     SIGNAL_DEVICE_UPDATE,
     SIGNAL_NEW_DEVICE,
@@ -38,11 +40,34 @@ class DeviceData:
 class CamOverlayCoordinator:
     """Subscribes to the broker, tracks devices, and publishes commands."""
 
-    def __init__(self, hass: HomeAssistant, prefix: str) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        prefix: str,
+        go2rtc_url: str | None = None,
+        cameras: list[str] | None = None,
+    ) -> None:
         self.hass = hass
         self.prefix = prefix
+        self.go2rtc_url = (go2rtc_url or "").rstrip("/")
+        # catalog of known camera source names (for reference / convenience)
+        self.cameras = cameras or []
         self.devices: dict[str, DeviceData] = {}
         self._unsubscribes: list = []
+
+    def resolve_urls(self, cameras: list[str]) -> list[str]:
+        """Turn camera source names (or full URLs) into single-frame stream URLs."""
+        urls: list[str] = []
+        for cam in cameras:
+            if not cam:
+                continue
+            cam = cam.strip()
+            if cam.startswith("http://") or cam.startswith("https://"):
+                urls.append(cam)
+            elif self.go2rtc_url:
+                urls.append(self.go2rtc_url + GO2RTC_FRAME_PATH.format(src=cam))
+            # else: no base URL configured -> cannot resolve a bare name, skip it
+        return urls[:MAX_CAMERAS]
 
     async def async_start(self) -> None:
         """Subscribe to availability + state for every device under the prefix."""
@@ -105,13 +130,25 @@ class CamOverlayCoordinator:
         topic = f"{self.prefix}/{device}/{TOPIC_CMD}"
         await mqtt.async_publish(self.hass, topic, json.dumps(payload), qos=0, retain=False)
 
-    async def async_fullscreen(self, device: str) -> None:
-        await self.async_publish(device, {"action": "full"})
+    async def async_fullscreen(
+        self, device: str, cameras: list[str] | None = None
+    ) -> None:
+        payload: dict = {"action": "full"}
+        if cameras:
+            urls = self.resolve_urls(cameras)
+            if urls:
+                payload["cameras"] = urls
+        await self.async_publish(device, payload)
 
     async def async_stop_cmd(self, device: str) -> None:
         await self.async_publish(device, {"action": "stop"})
 
-    async def async_pip(self, device: str, size: str, corner: str) -> None:
-        await self.async_publish(
-            device, {"action": "pip", "size": size, "corner": corner}
-        )
+    async def async_pip(
+        self, device: str, size: str, corner: str, cameras: list[str] | None = None
+    ) -> None:
+        payload: dict = {"action": "pip", "size": size, "corner": corner}
+        if cameras:
+            urls = self.resolve_urls(cameras)
+            if urls:
+                payload["cameras"] = urls
+        await self.async_publish(device, payload)

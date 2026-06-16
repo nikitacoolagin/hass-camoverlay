@@ -19,6 +19,8 @@ boot and keeps a foreground service alive.
 ## Features
 
 - **Fullscreen** camera on a device, or **picture-in-picture** in any corner.
+- **Multi-camera grid** — show **1, 2, 3 or 4** cameras at once, tiled in one PiP
+  window (or fullscreen). Layout adapts to the count (2 side-by-side, 3–4 in a 2×2).
 - **Adaptive PiP size** — `1/4` (half the screen width) or `1/16` (quarter of the
   screen width); the window keeps a 16:9 ratio so it always fits.
 - On-screen **close (✕)** and **fullscreen (⛶)** controls on phones.
@@ -51,8 +53,11 @@ boot and keeps a foreground service alive.
    (The badge above only works once the repository is known to HACS.)
 2. Install **CamOverlay**, then restart Home Assistant.
 3. **Settings → Devices & Services → Add Integration → CamOverlay.**
-   Set the MQTT topic prefix (default `camoverlay`) and, optionally, a camera entity
-   for dashboards.
+   Set the MQTT topic prefix (default `camoverlay`) and, optionally:
+   - a **go2rtc URL** (e.g. `http://192.168.1.10:1984`) — required for multi-camera
+     grids by *name* (see [Multiple cameras](#multiple-cameras));
+   - a list of **camera source names** (one per line);
+   - a camera entity for dashboards.
 
 > Manual install: copy `custom_components/camoverlay/` into your HA
 > `config/custom_components/` folder and restart.
@@ -107,6 +112,36 @@ data:
   device: tv
 ```
 
+### Multiple cameras
+
+Pass a `cameras` list (up to 4) to `camoverlay.pip` or `camoverlay.fullscreen` to tile
+several streams in one window. Entries are either **source names** (resolved against
+the **go2rtc URL** set in the integration options) or **full frame URLs**.
+
+```yaml
+# Four cameras in a 2×2 grid, fullscreen on the TV (by go2rtc source name)
+service: camoverlay.fullscreen
+data:
+  device: tv
+  cameras: [entrance, yard, gate, garage]
+
+# Two cameras side-by-side, small PiP, bottom-right on the phone (by full URL)
+service: camoverlay.pip
+data:
+  device: phone
+  size: small
+  corner: br
+  cameras:
+    - http://192.168.1.10:1984/api/frame.jpeg?src=entrance
+    - http://192.168.1.10:1984/api/frame.jpeg?src=yard
+```
+
+Layout by camera count: **1** → single, **2** → side-by-side, **3–4** → 2×2 grid.
+Omitting `cameras` keeps the old single-camera behaviour (the app uses the stream URL
+configured on the device). The per-device **Show PiP** button always shows that single
+camera; use a service call (or a dashboard button with a `perform-action` tap action)
+for multi-camera grids.
+
 ---
 
 ## MQTT contract
@@ -116,7 +151,7 @@ The integration and app talk over these topics (prefix configurable, default
 
 | Topic | Direction | Payload |
 | --- | --- | --- |
-| `camoverlay/<device>/cmd` | HA → app | `{"action":"full"}`, `{"action":"stop"}`, `{"action":"pip","size":"quarter\|small","corner":"tl\|tr\|bl\|br"}` |
+| `camoverlay/<device>/cmd` | HA → app | `{"action":"full"}`, `{"action":"stop"}`, `{"action":"pip","size":"quarter\|small","corner":"tl\|tr\|bl\|br"}`. Either action may also carry `"cameras":["url1",...]` (up to 4) to tile multiple streams. |
 | `camoverlay/<device>/availability` | app → HA | `online` / `offline` (retained, Last-Will) |
 | `camoverlay/<device>/state` | app → HA | `idle` / `full` / `pip:<size>:<corner>` (retained) |
 

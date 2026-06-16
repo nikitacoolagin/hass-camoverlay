@@ -11,7 +11,11 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class FullActivity extends Activity {
 
@@ -23,8 +27,7 @@ public class FullActivity extends Activity {
         if (a != null) a.finish();
     }
 
-    private CamStream stream;
-    private ImageView image;
+    private final List<CamStream> streams = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,12 +40,44 @@ public class FullActivity extends Activity {
                 | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
 
+        String[] urls = normalize(getIntent().getStringArrayExtra("urls"));
+
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
 
-        image = new ImageView(this);
-        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        root.addView(image, new FrameLayout.LayoutParams(
+        int[] cr = ControlService.gridDims(urls.length);
+        int cols = cr[0], rows = cr[1];
+        int targetW = Math.max(320, getResources().getDisplayMetrics().widthPixels / cols);
+
+        // Weighted grid that fills the screen: vertical rows, horizontal cells.
+        LinearLayout grid = new LinearLayout(this);
+        grid.setOrientation(LinearLayout.VERTICAL);
+        for (int r = 0; r < rows; r++) {
+            LinearLayout rowLl = new LinearLayout(this);
+            rowLl.setOrientation(LinearLayout.HORIZONTAL);
+            for (int c = 0; c < cols; c++) {
+                int idx = r * cols + c;
+                LinearLayout.LayoutParams clp =
+                        new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+                if (idx < urls.length) {
+                    ImageView iv = new ImageView(this);
+                    iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    iv.setBackgroundColor(Color.BLACK);
+                    rowLl.addView(iv, clp);
+                    final ImageView target = iv;
+                    streams.add(new CamStream(urls[idx], targetW, new CamStream.FrameListener() {
+                        public void onFrame(Bitmap bmp) { target.setImageBitmap(bmp); }
+                    }));
+                } else {
+                    View empty = new View(this);
+                    empty.setBackgroundColor(Color.BLACK);
+                    rowLl.addView(empty, clp);
+                }
+            }
+            grid.addView(rowLl, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        }
+        root.addView(grid, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
 
@@ -72,22 +107,35 @@ public class FullActivity extends Activity {
         }
 
         setContentView(root);
-
-        String url = getIntent().getStringExtra("url");
-        if (url == null) url = Config.DEFAULT_FULL_URL;
-
-        stream = new CamStream(url, 1280, new CamStream.FrameListener() {
-            public void onFrame(Bitmap bmp) { image.setImageBitmap(bmp); }
-        });
     }
 
-    @Override protected void onStart() { super.onStart(); stream.start(); }
-    @Override protected void onStop() { super.onStop(); stream.stop(); }
+    /** Drop empty entries; fall back to the single legacy "url" extra or the default. */
+    private String[] normalize(String[] urls) {
+        if (urls == null || urls.length == 0) {
+            String single = getIntent().getStringExtra("url");
+            return new String[]{ single != null ? single : Config.DEFAULT_FULL_URL };
+        }
+        String[] out = new String[urls.length];
+        for (int i = 0; i < urls.length; i++) {
+            out[i] = (urls[i] == null || urls[i].length() == 0) ? Config.DEFAULT_FULL_URL : urls[i];
+        }
+        return out;
+    }
+
+    @Override protected void onStart() {
+        super.onStart();
+        for (CamStream s : streams) s.start();
+    }
+
+    @Override protected void onStop() {
+        super.onStop();
+        for (CamStream s : streams) s.stop();
+    }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         if (instance == this) instance = null;
-        if (stream != null) stream.stop();
+        for (CamStream s : streams) s.stop();
     }
 }

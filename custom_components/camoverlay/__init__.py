@@ -9,9 +9,12 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 
 from .const import (
+    ATTR_CAMERAS,
     ATTR_CORNER,
     ATTR_DEVICE,
     ATTR_SIZE,
+    CONF_CAMERAS,
+    CONF_GO2RTC,
     CONF_PREFIX,
     CORNERS,
     DEFAULT_CORNER,
@@ -29,9 +32,12 @@ from .coordinator import CamOverlayCoordinator
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up CamOverlay from a config entry."""
-    prefix = entry.options.get(CONF_PREFIX, entry.data.get(CONF_PREFIX, DEFAULT_PREFIX))
+    conf = {**entry.data, **entry.options}
+    prefix = conf.get(CONF_PREFIX, DEFAULT_PREFIX)
+    go2rtc_url = conf.get(CONF_GO2RTC)
+    cameras = conf.get(CONF_CAMERAS, [])
 
-    coordinator = CamOverlayCoordinator(hass, prefix)
+    coordinator = CamOverlayCoordinator(hass, prefix, go2rtc_url, cameras)
     await coordinator.async_start()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -77,7 +83,8 @@ def _async_register_services(hass: HomeAssistant) -> None:
 
     async def _fullscreen(call: ServiceCall) -> None:
         device = call.data[ATTR_DEVICE]
-        await _resolve_coordinator(hass, device).async_fullscreen(device)
+        cameras = call.data.get(ATTR_CAMERAS)
+        await _resolve_coordinator(hass, device).async_fullscreen(device, cameras)
 
     async def _stop(call: ServiceCall) -> None:
         device = call.data[ATTR_DEVICE]
@@ -87,13 +94,19 @@ def _async_register_services(hass: HomeAssistant) -> None:
         device = call.data[ATTR_DEVICE]
         size = call.data.get(ATTR_SIZE, DEFAULT_SIZE)
         corner = call.data.get(ATTR_CORNER, DEFAULT_CORNER)
-        await _resolve_coordinator(hass, device).async_pip(device, size, corner)
+        cameras = call.data.get(ATTR_CAMERAS)
+        await _resolve_coordinator(hass, device).async_pip(device, size, corner, cameras)
 
     hass.services.async_register(
         DOMAIN,
         SERVICE_FULLSCREEN,
         _fullscreen,
-        schema=vol.Schema({vol.Required(ATTR_DEVICE): cv.string}),
+        schema=vol.Schema(
+            {
+                vol.Required(ATTR_DEVICE): cv.string,
+                vol.Optional(ATTR_CAMERAS): vol.All(cv.ensure_list, [cv.string]),
+            }
+        ),
     )
     hass.services.async_register(
         DOMAIN,
@@ -110,6 +123,7 @@ def _async_register_services(hass: HomeAssistant) -> None:
                 vol.Required(ATTR_DEVICE): cv.string,
                 vol.Optional(ATTR_SIZE, default=DEFAULT_SIZE): vol.In(SIZES),
                 vol.Optional(ATTR_CORNER, default=DEFAULT_CORNER): vol.In(CORNERS),
+                vol.Optional(ATTR_CAMERAS): vol.All(cv.ensure_list, [cv.string]),
             }
         ),
     )

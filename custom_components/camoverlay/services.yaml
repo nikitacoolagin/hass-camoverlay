@@ -1,6 +1,6 @@
 fullscreen:
   name: Fullscreen
-  description: Show the camera fullscreen on a device.
+  description: Show one or more cameras fullscreen on a device.
   fields:
     device:
       name: Device
@@ -9,6 +9,16 @@ fullscreen:
       example: tv
       selector:
         text:
+    cameras:
+      name: Cameras
+      description: >-
+        Up to 4 camera source names (resolved via the go2rtc URL in the
+        integration options) or full frame URLs. With more than one camera they
+        are tiled in a grid. Leave empty to use the device's own configured camera.
+      required: false
+      example: "[entrance, yard]"
+      selector:
+        object:
 
 stop:
   name: Stop
@@ -55,3 +65,14 @@ pip:
             - tr
             - bl
             - br
+    cameras:
+      name: Cameras
+      description: >-
+        Up to 4 camera source names (resolved via the go2rtc URL in the
+        integration options) or full frame URLs. With more than one camera they
+        are tiled in a grid inside the PiP window. Leave empty to use the
+        device's own configured camera.
+      required: false
+      example: "[entrance, yard, gate, garage]"
+      selector:
+        object:

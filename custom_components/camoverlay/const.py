@@ -4,8 +4,13 @@ DOMAIN = "camoverlay"
 
 CONF_PREFIX = "prefix"
 CONF_CAMERA = "camera_entity"
+CONF_GO2RTC = "go2rtc_url"
+CONF_CAMERAS = "cameras"
 
 DEFAULT_PREFIX = "camoverlay"
+
+# go2rtc single-frame endpoint template (src is the camera source name)
+GO2RTC_FRAME_PATH = "/api/frame.jpeg?src={src}"
 
 # MQTT subtopics (relative to "<prefix>/<device>/")
 TOPIC_CMD = "cmd"
@@ -52,5 +57,9 @@ SERVICE_STOP = "stop"
 ATTR_DEVICE = "device"
 ATTR_SIZE = "size"
 ATTR_CORNER = "corner"
+ATTR_CAMERAS = "cameras"
+
+# how many cameras the app can tile in one grid
+MAX_CAMERAS = 4
 
 PLATFORMS = ["binary_sensor", "sensor", "button", "select"]

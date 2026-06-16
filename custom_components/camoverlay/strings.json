@@ -6,6 +6,8 @@
         "description": "Set the MQTT topic prefix the app publishes under (default: camoverlay). Devices are discovered automatically.",
         "data": {
           "prefix": "MQTT topic prefix",
+          "go2rtc_url": "go2rtc URL (e.g. http://192.168.1.10:1984)",
+          "cameras": "Camera source names (one per line) for multi-camera grids",
           "camera_entity": "Camera entity (optional, for dashboards)"
         }
       }
@@ -21,6 +23,8 @@
         "title": "CamOverlay options",
         "data": {
           "prefix": "MQTT topic prefix",
+          "go2rtc_url": "go2rtc URL (e.g. http://192.168.1.10:1984)",
+          "cameras": "Camera source names (one per line) for multi-camera grids",
           "camera_entity": "Camera entity (optional, for dashboards)"
         }
       }

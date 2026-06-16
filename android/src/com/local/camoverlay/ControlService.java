@@ -16,6 +16,7 @@ import android.view.Display;
 import android.view.Gravity;
 import android.view.WindowManager;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
@@ -85,6 +86,7 @@ public class ControlService extends Service {
     private void dispatch(String payload) {
         String action;
         String size = "quarter", corner = "br", url = null;
+        String[] cameras = null;
         try {
             String t = payload.trim();
             if (t.startsWith("{")) {
@@ -93,6 +95,12 @@ public class ControlService extends Service {
                 size = j.optString("size", size);
                 corner = j.optString("corner", corner);
                 if (j.has("url")) url = j.optString("url");
+                JSONArray arr = j.optJSONArray("cameras");
+                if (arr != null && arr.length() > 0) {
+                    int n = Math.min(arr.length(), 4);   // grid supports up to 4
+                    cameras = new String[n];
+                    for (int k = 0; k < n; k++) cameras[k] = arr.optString(k);
+                }
             } else {
                 // plain text: "full" | "stop" | "pip quarter br"
                 String[] p = t.split("\\s+");
@@ -105,21 +113,30 @@ public class ControlService extends Service {
             return;
         }
 
+        // One or many camera URLs; null entries fall back to the device default.
+        String[] urls = (cameras != null) ? cameras : new String[]{ url };
+
         if ("full".equals(action)) {
             Intent i = new Intent(this, FullActivity.class);
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            if (url != null) i.putExtra("url", url);
+            i.putExtra("urls", urls);
             try { startActivity(i); } catch (Throwable e) { LAST_ERROR = "full: " + e.getMessage(); }
             publishState("full");
         } else if ("pip".equals(action)) {
-            int[] wh = pipSize(size);
+            int[] cr = gridDims(urls.length);
+            int cols = cr[0], rows = cr[1];
+            int totalW = pipWidth(size);
+            int cellW = totalW / cols;
+            int cellH = Math.round(cellW * 9f / 16f);
             Intent i = new Intent(this, OverlayService.class);
             i.putExtra("action", "show");
-            i.putExtra("w", wh[0]);
-            i.putExtra("h", wh[1]);
+            i.putExtra("cols", cols);
+            i.putExtra("rows", rows);
+            i.putExtra("cellW", cellW);
+            i.putExtra("cellH", cellH);
             i.putExtra("corner", corner);
             i.putExtra("margin", 24);
-            if (url != null) i.putExtra("url", url);
+            i.putExtra("urls", urls);
             try { startService(i); } catch (Throwable e) { LAST_ERROR = "pip: " + e.getMessage(); }
             publishState("pip:" + size + ":" + corner);
         } else if ("stop".equals(action)) {
@@ -133,7 +150,8 @@ public class ControlService extends Service {
         }
     }
 
-    private int[] pipSize(String size) {
+    /** Total PiP block width: 1/2 (quarter) or 1/4 (small) of the current screen width. */
+    private int pipWidth(String size) {
         Point p = new Point();
         try {
             WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
@@ -141,9 +159,14 @@ public class ControlService extends Service {
             d.getRealSize(p);
         } catch (Throwable t) { p.x = 1280; p.y = 720; }
         int screenW = p.x;                                            // current-orientation width
-        int w = "small".equals(size) ? screenW / 4 : screenW / 2;     // 1/4 or 1/2 of screen width
-        int h = Math.round(w * 9f / 16f);                             // keep 16:9 so it always fits
-        return new int[]{ w, h };
+        return "small".equals(size) ? screenW / 4 : screenW / 2;      // 1/4 or 1/2 of screen width
+    }
+
+    /** Grid columns/rows for a given camera count (1..4). Shared with FullActivity. */
+    static int[] gridDims(int n) {
+        if (n <= 1) return new int[]{1, 1};
+        if (n == 2) return new int[]{2, 1};
+        return new int[]{2, 2};                                       // 3 or 4 cameras
     }
 
     private void publishState(String state) {
