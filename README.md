@@ -44,9 +44,11 @@ boot and keeps a foreground service alive.
 
 ### 1. Home Assistant integration (HACS)
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=nikitacoolagin&repository=hass-camoverlay)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=nikitacoolagin&repository=hass-camoverlay&category=integration)
 
-1. HACS → **Custom repositories** → add this repo as an **Integration**.
+1. In **HACS → ⋮ (top right) → Custom repositories**, add
+   `https://github.com/nikitacoolagin/hass-camoverlay` with category **Integration**.
+   (The badge above only works once the repository is known to HACS.)
 2. Install **CamOverlay**, then restart Home Assistant.
 3. **Settings → Devices & Services → Add Integration → CamOverlay.**
    Set the MQTT topic prefix (default `camoverlay`) and, optionally, a camera entity
