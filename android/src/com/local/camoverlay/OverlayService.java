@@ -7,14 +7,19 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
+import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.IBinder;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.VideoView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +34,8 @@ public class OverlayService extends Service {
     private WindowManager wm;
     private FrameLayout root;
     private final List<CamStream> streams = new ArrayList<>();
+    private final List<VideoView> videos = new ArrayList<>();
+    private final List<WebView> webViews = new ArrayList<>();
     private boolean shown = false;
 
     @Override
@@ -79,17 +86,41 @@ public class OverlayService extends Service {
             rowLl.setOrientation(LinearLayout.HORIZONTAL);
             for (int c = 0; c < cols; c++) {
                 int idx = r * cols + c;
-                ImageView iv = new ImageView(this);
-                iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                iv.setBackgroundColor(Color.BLACK);
                 LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(cellW, cellH);
                 clp.setMargins(c > 0 ? gap : 0, r > 0 ? gap : 0, 0, 0);
-                rowLl.addView(iv, clp);
                 if (idx < urls.length) {
-                    final ImageView target = iv;
-                    streams.add(new CamStream(urls[idx], cellW, new CamStream.FrameListener() {
-                        public void onFrame(Bitmap bmp) { target.setImageBitmap(bmp); }
-                    }));
+                    String url = urls[idx];
+                    if (isWebViewUrl(url)) {
+                        WebView wv = makeWebView();
+                        wv.loadUrl(url);
+                        rowLl.addView(wv, clp);
+                        webViews.add(wv);
+                    } else if (isNativeVideoUrl(url)) {
+                        VideoView vv = new VideoView(this);
+                        vv.setBackgroundColor(Color.BLACK);
+                        vv.setVideoURI(Uri.parse(url));
+                        vv.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                            public void onPrepared(MediaPlayer mp) {
+                                try { mp.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT); } catch (Throwable ignored) {}
+                                mp.start();
+                            }
+                        });
+                        rowLl.addView(vv, clp);
+                        videos.add(vv);
+                    } else {
+                        ImageView iv = new ImageView(this);
+                        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        iv.setBackgroundColor(Color.BLACK);
+                        rowLl.addView(iv, clp);
+                        final ImageView target = iv;
+                        streams.add(new CamStream(url, cellW, new CamStream.FrameListener() {
+                            public void onFrame(Bitmap bmp) { target.setImageBitmap(bmp); }
+                        }));
+                    }
+                } else {
+                    View empty = new View(this);
+                    empty.setBackgroundColor(Color.BLACK);
+                    rowLl.addView(empty, clp);
                 }
             }
             grid.addView(rowLl, new LinearLayout.LayoutParams(
@@ -144,6 +175,9 @@ public class OverlayService extends Service {
         shown = true;
 
         for (CamStream s : streams) s.start();
+        for (VideoView v : videos) {
+            try { v.start(); } catch (Throwable ignored) {}
+        }
         return START_STICKY;
     }
 
@@ -159,6 +193,15 @@ public class OverlayService extends Service {
 
     private int dp(float v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    private static boolean isNativeVideoUrl(String url) {
+        if (url == null) return false;
+        String low = url.toLowerCase();
+        return low.startsWith("rtsp://")
+                || low.endsWith(".m3u8")
+                || low.contains("/api/stream.m3u8")
+                || low.contains("/api/ws?src=");
     }
 
     private TextView makeButton(String label, int gravity) {
@@ -187,10 +230,40 @@ public class OverlayService extends Service {
     private void teardown() {
         for (CamStream s : streams) s.stop();
         streams.clear();
+        for (VideoView v : videos) {
+            try { v.stopPlayback(); } catch (Throwable ignored) {}
+        }
+        videos.clear();
+        for (WebView wv : webViews) {
+            try {
+                wv.stopLoading();
+                wv.loadUrl("about:blank");
+                wv.destroy();
+            } catch (Throwable ignored) {}
+        }
+        webViews.clear();
         if (wm != null && root != null) {
             try { wm.removeView(root); } catch (Throwable ignored) {}
         }
         root = null; shown = false;
+    }
+
+    private WebView makeWebView() {
+        WebView wv = new WebView(this);
+        wv.setBackgroundColor(Color.BLACK);
+        WebSettings s = wv.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setLoadWithOverviewMode(true);
+        s.setUseWideViewPort(true);
+        return wv;
+    }
+
+    private static boolean isWebViewUrl(String url) {
+        if (url == null) return false;
+        String low = url.toLowerCase();
+        return low.contains("/stream.html") || low.contains("mode=webrtc");
     }
 
     @Override

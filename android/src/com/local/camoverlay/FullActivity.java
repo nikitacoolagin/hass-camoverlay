@@ -5,14 +5,19 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.media.MediaPlayer;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.VideoView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +33,8 @@ public class FullActivity extends Activity {
     }
 
     private final List<CamStream> streams = new ArrayList<>();
+    private final List<VideoView> videos = new ArrayList<>();
+    private final List<WebView> webViews = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,14 +67,34 @@ public class FullActivity extends Activity {
                 LinearLayout.LayoutParams clp =
                         new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
                 if (idx < urls.length) {
-                    ImageView iv = new ImageView(this);
-                    iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                    iv.setBackgroundColor(Color.BLACK);
-                    rowLl.addView(iv, clp);
-                    final ImageView target = iv;
-                    streams.add(new CamStream(urls[idx], targetW, new CamStream.FrameListener() {
-                        public void onFrame(Bitmap bmp) { target.setImageBitmap(bmp); }
-                    }));
+                    String url = urls[idx];
+                    if (isWebViewUrl(url)) {
+                        WebView wv = makeWebView();
+                        wv.loadUrl(url);
+                        rowLl.addView(wv, clp);
+                        webViews.add(wv);
+                    } else if (isNativeVideoUrl(url)) {
+                        VideoView vv = new VideoView(this);
+                        vv.setBackgroundColor(Color.BLACK);
+                        vv.setVideoURI(Uri.parse(url));
+                        vv.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                            public void onPrepared(MediaPlayer mp) {
+                                try { mp.setVideoScalingMode(MediaPlayer.VIDEO_SCALING_MODE_SCALE_TO_FIT); } catch (Throwable ignored) {}
+                                mp.start();
+                            }
+                        });
+                        rowLl.addView(vv, clp);
+                        videos.add(vv);
+                    } else {
+                        ImageView iv = new ImageView(this);
+                        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                        iv.setBackgroundColor(Color.BLACK);
+                        rowLl.addView(iv, clp);
+                        final ImageView target = iv;
+                        streams.add(new CamStream(url, targetW, new CamStream.FrameListener() {
+                            public void onFrame(Bitmap bmp) { target.setImageBitmap(bmp); }
+                        }));
+                    }
                 } else {
                     View empty = new View(this);
                     empty.setBackgroundColor(Color.BLACK);
@@ -125,11 +152,17 @@ public class FullActivity extends Activity {
     @Override protected void onStart() {
         super.onStart();
         for (CamStream s : streams) s.start();
+        for (VideoView v : videos) {
+            try { v.start(); } catch (Throwable ignored) {}
+        }
     }
 
     @Override protected void onStop() {
         super.onStop();
         for (CamStream s : streams) s.stop();
+        for (VideoView v : videos) {
+            try { v.pause(); } catch (Throwable ignored) {}
+        }
     }
 
     @Override
@@ -137,5 +170,44 @@ public class FullActivity extends Activity {
         super.onDestroy();
         if (instance == this) instance = null;
         for (CamStream s : streams) s.stop();
+        for (VideoView v : videos) {
+            try { v.stopPlayback(); } catch (Throwable ignored) {}
+        }
+        videos.clear();
+        for (WebView wv : webViews) {
+            try {
+                wv.stopLoading();
+                wv.loadUrl("about:blank");
+                wv.destroy();
+            } catch (Throwable ignored) {}
+        }
+        webViews.clear();
+    }
+
+    private WebView makeWebView() {
+        WebView wv = new WebView(this);
+        wv.setBackgroundColor(Color.BLACK);
+        WebSettings s = wv.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setLoadWithOverviewMode(true);
+        s.setUseWideViewPort(true);
+        return wv;
+    }
+
+    private static boolean isWebViewUrl(String url) {
+        if (url == null) return false;
+        String low = url.toLowerCase();
+        return low.contains("/stream.html") || low.contains("mode=webrtc");
+    }
+
+    private static boolean isNativeVideoUrl(String url) {
+        if (url == null) return false;
+        String low = url.toLowerCase();
+        return low.startsWith("rtsp://")
+                || low.endsWith(".m3u8")
+                || low.contains("/api/stream.m3u8")
+                || low.contains("/api/ws?src=");
     }
 }
