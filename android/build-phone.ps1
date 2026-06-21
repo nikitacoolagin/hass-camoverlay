@@ -32,8 +32,13 @@ $classFiles = Get-ChildItem "$out\classes" -Recurse -Filter *.class | ForEach-Ob
 if ($LASTEXITCODE -ne 0) { throw "d8 failed" }
 Write-Host "d8 OK -> $out\classes.dex"
 
-# 3. link manifest into base apk (no resources) -- PHONE manifest, target 34
-& $aapt2 link -o "$out\base.apk" -I $androidJar --manifest "$app\AndroidManifest.phone.xml" --min-sdk-version 17 --target-sdk-version 33
+# 3a. compile resources (launcher icons + TV banner)
+& $aapt2 compile --dir "$app\res" -o "$out\res.flata"
+if ($LASTEXITCODE -ne 0) { throw "aapt2 compile failed" }
+Write-Host "aapt2 compile OK"
+
+# 3b. link manifest + resources into base apk -- PHONE manifest, target 33
+& $aapt2 link -o "$out\base.apk" -I $androidJar "$out\res.flata" --manifest "$app\AndroidManifest.phone.xml" --min-sdk-version 17 --target-sdk-version 33
 if ($LASTEXITCODE -ne 0) { throw "aapt2 link failed" }
 Write-Host "aapt2 link OK"
 
@@ -49,8 +54,8 @@ Write-Host "aapt add classes.dex OK"
 & $zipalign -f 4 "$out\base.apk" "$out\aligned.apk"
 if ($LASTEXITCODE -ne 0) { throw "zipalign failed" }
 
-# 6. sign
-& $apksigner sign --ks "$root\debug.keystore" --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android --min-sdk-version 17 --out "$out\camoverlay-phone.apk" "$out\aligned.apk"
+# 6. sign (release key; generate your own with keytool, see README)
+& $apksigner sign --ks "$root\camoverlay-release.keystore" --ks-pass pass:camoverlay --ks-key-alias camoverlay --key-pass pass:camoverlay --min-sdk-version 17 --out "$out\camoverlay-phone.apk" "$out\aligned.apk"
 if ($LASTEXITCODE -ne 0) { throw "apksigner failed" }
 Write-Host "APK signed -> $out\camoverlay-phone.apk"
 Write-Host ("SIZE: " + (Get-Item "$out\camoverlay-phone.apk").Length + " bytes")

@@ -1,5 +1,6 @@
 package com.local.camoverlay;
 
+import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -7,13 +8,17 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
 import android.graphics.Point;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.provider.Settings;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.View;
 import android.view.WindowManager;
 
 import org.json.JSONArray;
@@ -36,6 +41,7 @@ public class ControlService extends Service {
 
     private MqttClient mqtt;
     private Prefs prefs;
+    private View keepAlive;   // 1x1 invisible overlay that pins process priority
     private final Handler main = new Handler(Looper.getMainLooper());
 
     @Override
@@ -43,8 +49,76 @@ public class ControlService extends Service {
         super.onCreate();
         prefs = new Prefs(this);
         startForegroundNotice();
+        addKeepAliveWindow();
+        scheduleWatchdog();
         connectMqtt();
         RUNNING = true;
+    }
+
+    /**
+     * Universal safety net for any TV ROM that eventually evicts a background
+     * service. A periodic alarm re-issues startService so the MQTT listener
+     * comes back on its own. It is gated on the autostart pref (see
+     * {@link BootReceiver}), so an explicit Stop from the UI stays stopped.
+     * This covers plain kills; the few OEMs that additionally force-stop the
+     * whole package (which also cancels alarms) are handled separately by
+     * rendering the camera as an overlay instead of an activity.
+     */
+    private void scheduleWatchdog() {
+        try {
+            AlarmManager am = (AlarmManager) getSystemService(ALARM_SERVICE);
+            Intent i = new Intent(this, BootReceiver.class).setAction(BootReceiver.ACTION_WATCHDOG);
+            int piFlags = (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0)
+                    | PendingIntent.FLAG_UPDATE_CURRENT;
+            PendingIntent pi = PendingIntent.getBroadcast(this, 1, i, piFlags);
+            long interval = 15 * 60 * 1000L;   // ~15 min, inexact (battery-friendly)
+            am.setInexactRepeating(AlarmManager.RTC_WAKEUP,
+                    System.currentTimeMillis() + interval, interval, pi);
+        } catch (Throwable t) {
+            LAST_ERROR = "watchdog: " + t.getMessage();
+        }
+    }
+
+    /**
+     * Some TV ROMs (e.g. MiTV) deny foreground-service promotion for non-OEM apps,
+     * so {@code startForeground} alone does not stop the system from evicting us when
+     * the app is backgrounded. Owning a window in the WindowManager keeps the process
+     * at "visible" priority, which survives Home/background without the OEM whitelist.
+     * The window is a single transparent pixel in the top-left corner — invisible to
+     * the user but a real, drawn window as far as the system is concerned.
+     */
+    private void addKeepAliveWindow() {
+        if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(this)) return;
+        try {
+            WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+            keepAlive = new View(this);
+            keepAlive.setBackgroundColor(Color.TRANSPARENT);
+            int type = (Build.VERSION.SDK_INT >= 26)
+                    ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                    : WindowManager.LayoutParams.TYPE_PHONE;
+            WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                    1, 1, type,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                            | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                    PixelFormat.TRANSLUCENT);
+            lp.gravity = Gravity.TOP | Gravity.LEFT;
+            lp.x = 0;
+            lp.y = 0;
+            wm.addView(keepAlive, lp);
+        } catch (Throwable t) {
+            keepAlive = null;
+            LAST_ERROR = "keepalive: " + t.getMessage();
+        }
+    }
+
+    private void removeKeepAliveWindow() {
+        if (keepAlive == null) return;
+        try {
+            WindowManager wm = (WindowManager) getSystemService(WINDOW_SERVICE);
+            wm.removeView(keepAlive);
+        } catch (Throwable ignored) {}
+        keepAlive = null;
     }
 
     @Override
@@ -117,10 +191,17 @@ public class ControlService extends Service {
         String[] urls = (cameras != null) ? cameras : new String[]{ url };
 
         if ("full".equals(action)) {
-            Intent i = new Intent(this, FullActivity.class);
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            // Full-screen as an overlay window (NOT an Activity): on MiTV, pausing
+            // an activity force-stops the whole package, which would kill this
+            // service too. A service-owned overlay survives backgrounding.
+            int[] cr = gridDims(urls.length);
+            Intent i = new Intent(this, OverlayService.class);
+            i.putExtra("action", "show");
+            i.putExtra("mode", "full");
+            i.putExtra("cols", cr[0]);
+            i.putExtra("rows", cr[1]);
             i.putExtra("urls", urls);
-            try { startActivity(i); } catch (Throwable e) { LAST_ERROR = "full: " + e.getMessage(); }
+            try { startService(i); } catch (Throwable e) { LAST_ERROR = "full: " + e.getMessage(); }
             publishState("full");
         } else if ("pip".equals(action)) {
             int[] cr = gridDims(urls.length);
@@ -130,6 +211,7 @@ public class ControlService extends Service {
             int cellH = Math.round(cellW * 9f / 16f);
             Intent i = new Intent(this, OverlayService.class);
             i.putExtra("action", "show");
+            i.putExtra("mode", "pip");
             i.putExtra("cols", cols);
             i.putExtra("rows", rows);
             i.putExtra("cellW", cellW);
@@ -143,7 +225,6 @@ public class ControlService extends Service {
             Intent i = new Intent(this, OverlayService.class);
             i.putExtra("action", "stop");
             try { startService(i); } catch (Throwable ignored) {}
-            FullActivity.finishVisible();
             publishState("idle");
         } else {
             LAST_ERROR = "unknown action: " + action;
@@ -162,7 +243,7 @@ public class ControlService extends Service {
         return "small".equals(size) ? screenW / 4 : screenW / 2;      // 1/4 or 1/2 of screen width
     }
 
-    /** Grid columns/rows for a given camera count (1..4). Shared with FullActivity. */
+    /** Grid columns/rows for a given camera count (1..4). Shared with OverlayService. */
     static int[] gridDims(int n) {
         if (n <= 1) return new int[]{1, 1};
         if (n == 2) return new int[]{2, 1};
@@ -202,6 +283,7 @@ public class ControlService extends Service {
         super.onDestroy();
         RUNNING = false;
         MQTT_CONNECTED = false;
+        removeKeepAliveWindow();
         if (mqtt != null) {
             mqtt.publish(prefs.availTopic(), "offline", true);
             mqtt.stop();

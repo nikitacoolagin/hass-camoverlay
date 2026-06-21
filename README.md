@@ -2,7 +2,7 @@
 
 # 📺 CamOverlay
 
-**Show any RTSP/MJPEG camera on your Android TV or phone — fullscreen or as a floating picture-in-picture window — driven entirely from Home Assistant over MQTT.**
+**Show any WebRTC/RTSP/MJPEG camera on your Android TV or phone — fullscreen or as a floating picture-in-picture window — driven entirely from Home Assistant over MQTT.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![HACS: Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
@@ -52,10 +52,19 @@ No ADB and no root are required for control — the app simply listens on MQTT. 
 - 🖥️ **Fullscreen** camera on a device, or 🪟 **picture-in-picture** in any corner.
 - 🔲 **Multi-camera grid** — show **1, 2, 3 or 4** cameras at once, tiled in one PiP window (or fullscreen). The layout adapts to the count: **2** side-by-side, **3–4** in a 2×2.
 - 📐 **Adaptive PiP size** — `1/4` (half the screen width) or `1/16` (a quarter of the screen width); the window keeps a 16:9 ratio so it always fits.
+- 🎬 **Low-latency playback** — a cell auto-picks the best renderer from its URL: a go2rtc `stream.html` (WebRTC / MSE) page for real-time video, native `rtsp://` / `.m3u8`, or the lightweight MJPEG / single-JPEG frame default.
 - ✋ On-screen **close (✕)** and **fullscreen (⛶)** controls on phones.
 - 🔎 **Auto-discovery** in Home Assistant — each `tv`, `phone`, … becomes a HA device with its own entities.
 - 📡 Per-device **online** sensor and **state** sensor.
 - ⚙️ Services for automations: `camoverlay.fullscreen`, `camoverlay.pip`, `camoverlay.stop`.
+
+### Screenshots
+
+The overlay floats over **anything** — below it is sitting on top of the Android TV launcher, driven entirely from Home Assistant.
+
+| 4 cameras · `1/4` · top-right | 2 cameras · `1/16` · bottom-right |
+|:---:|:---:|
+| ![Four-camera 2×2 grid PiP over the launcher](docs/screenshot-grid-4cam.png) | ![Two-camera PiP over the launcher](docs/screenshot-pip-2cam.png) |
 
 ### How it works
 
@@ -324,10 +333,19 @@ CamOverlay состоит из двух частей, которые общаю�
 - 🖥️ Камера **на весь экран** или 🪟 **картинка-в-картинке** (PiP) в любом углу.
 - 🔲 **Сетка из нескольких камер** — показ **1, 2, 3 или 4** камер одновременно в одном PiP-окне (или на весь экран). Раскладка подстраивается под количество: **2** — бок о бок, **3–4** — сеткой 2×2.
 - 📐 **Адаптивный размер PiP** — `1/4` (половина ширины экрана) или `1/16` (четверть ширины); окно сохраняет соотношение 16:9 и всегда помещается.
+- 🎬 **Низкая задержка** — ячейка сама выбирает рендер по URL: страница плеера go2rtc `stream.html` (WebRTC / MSE) для видео в реальном времени, нативные `rtsp://` / `.m3u8` или лёгкий дефолт MJPEG / одиночные JPEG-кадры.
 - ✋ Экранные кнопки **закрыть (✕)** и **на весь экран (⛶)** на телефонах.
 - 🔎 **Автообнаружение** в Home Assistant — каждое `tv`, `phone`, … становится отдельным устройством HA со своими сущностями.
 - 📡 На каждое устройство — сенсор **онлайн** и сенсор **состояния**.
 - ⚙️ Сервисы для автоматизаций: `camoverlay.fullscreen`, `camoverlay.pip`, `camoverlay.stop`.
+
+### Скриншоты
+
+Оверлей висит поверх **чего угодно** — ниже он лежит на лаунчере Android TV, всё управление из Home Assistant.
+
+| 4 камеры · `1/4` · вверху справа | 2 камеры · `1/16` · внизу справа |
+|:---:|:---:|
+| ![Сетка 4 камеры 2×2 поверх лаунчера](docs/screenshot-grid-4cam.png) | ![PiP из 2 камер поверх лаунчера](docs/screenshot-pip-2cam.png) |
 
 ### Как это работает
 

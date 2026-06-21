@@ -4,7 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 
-/** App configuration, persisted in SharedPreferences. Override defaults below or set them in-app. */
+/** App configuration, persisted in SharedPreferences. Defaults point at our broker/stream. */
 public class Prefs {
 
     private static final String FILE = "camoverlay";
@@ -17,10 +17,10 @@ public class Prefs {
     public static final String K_URL = "stream_url";
     public static final String K_AUTOSTART = "autostart";
 
-    public static final String DEF_HOST = "";       // set in the app's settings screen
+    public static final String DEF_HOST = "192.168.2.113";
     public static final int DEF_PORT = 1883;
-    public static final String DEF_USER = "";
-    public static final String DEF_PASS = "";
+    public static final String DEF_USER = "mqtt";
+    public static final String DEF_PASS = "mqtt";
     public static final String DEF_URL = Config.DEFAULT_FULL_URL;
 
     private final SharedPreferences sp;
