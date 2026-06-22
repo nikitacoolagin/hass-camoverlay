@@ -22,6 +22,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/banner"
         android:usesCleartextTraffic="true"
+        android:persistent="true"
         android:allowBackup="false">
 
         <activity

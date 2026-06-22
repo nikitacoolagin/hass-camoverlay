@@ -1,0 +1,6 @@
+id=camoverlay_systemapp
+name=CamOverlay (system app)
+version=v1.2.0-system
+versionCode=109
+author=nikitacoolagin
+description=Installs CamOverlay into /system/app as a persistent system app so aggressive TV ROMs (e.g. Xiaomi MiTV) cannot force-stop it on background or resource-kill the WebView. EXPERIMENTAL — for the system-app branch.
